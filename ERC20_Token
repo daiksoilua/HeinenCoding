@@ -1,0 +1,52 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
+
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract MyToken is ERC20, Ownable {
+    uint256 private _maxSupply;
+    mapping(address => bool) private _blacklisted;
+
+    event Blacklist(address indexed account);
+    event Unblacklist(address indexed account);
+    event MaxSupplyChanged(uint256 newMaxSupply);
+
+    constructor(uint256 initialSupply, uint256 maxSupply) ERC20("MyToken", "MTK") {
+        _mint(msg.sender, initialSupply);
+        _maxSupply = maxSupply;
+    }
+
+    function blacklist(address account) public onlyOwner {
+        require(!_blacklisted[account], "Account is already blacklisted");
+        _blacklisted[account] = true;
+        emit Blacklist(account);
+    }
+
+    function unblacklist(address account) public onlyOwner {
+        require(_blacklisted[account], "Account is not blacklisted");
+        _blacklisted[account] = false;
+        emit Unblacklist(account);
+    }
+
+    function isBlacklisted(address account) public view returns (bool) {
+        return _blacklisted[account];
+    }
+
+    function setMaxSupply(uint256 newMaxSupply) public onlyOwner {
+        require(newMaxSupply >= totalSupply(), "New max supply must be greater than or equal to current total supply");
+        _maxSupply = newMaxSupply;
+        emit MaxSupplyChanged(newMaxSupply);
+    }
+
+    function getMaxSupply() public view returns (uint256) {
+        return _maxSupply;
+    }
+
+    function _beforeTokenTransfer(address from, address to, uint256 amount) internal override {
+        require(totalSupply() + amount <= _maxSupply, "Exceeds max supply");
+        require(!_blacklisted[from], "Sender is blacklisted");
+        require(!_blacklisted[to], "Recipient is blacklisted");
+        super._beforeTokenTransfer(from, to, amount);
+    }
+}
